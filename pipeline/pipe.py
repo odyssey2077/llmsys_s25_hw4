@@ -1,6 +1,7 @@
 from typing import Any, Iterable, Iterator, List, Optional, Union, Sequence, Tuple, cast
 
 import torch
+import math
 from torch import Tensor, nn
 import torch.autograd
 import torch.cuda
@@ -27,7 +28,22 @@ def _clock_cycles(num_batches: int, num_partitions: int) -> Iterable[List[Tuple[
     This function should yield schedules for each clock cycle.
     '''
     # BEGIN SOLUTION
-    raise NotImplementedError("Schedule Generation Not Implemented Yet")
+    schedule = []
+    while True:
+        if len(schedule) == 0:
+            schedule.append((0, 0))
+        elif len(schedule) == 1:
+            assert schedule[0][0] == num_batches-1 and schedule[0][1] == num_partitions-1
+            yield schedule
+            break
+        else:
+            schedule = []
+            for i, j in schedule:
+                if j == 0 and i < num_batches - 1:
+                    schedule.append((i+1, 0))
+                if j < num_partitions - 1:
+                    schedule.append((i, j+1))
+        yield schedule
     # END SOLUTION
 
 class Pipe(nn.Module):
@@ -55,7 +71,13 @@ class Pipe(nn.Module):
         Please note that you should put the result on the last device. Putting the result on the same device as input x will lead to pipeline parallel training failing.
         '''
         # BEGIN SOLUTION
-        raise NotImplementedError("Pipeline Parallel Not Implemented Yet")
+        batch_size = x.size(0)
+        num_microbatches = math.ceil(batch_size / self.split_size)
+        batches = x.chunk(num_microbatches, dim=0)
+        self.schedule = _clock_cycles(len(batches), len(self.partitions))
+        for schedule in self.schedule:
+            self.compute(batches, schedule)
+        return torch.cat(batches, dim=0)
         # END SOLUTION
 
     # ASSIGNMENT 4.2
@@ -72,6 +94,16 @@ class Pipe(nn.Module):
         devices = self.devices
 
         # BEGIN SOLUTION
-        raise NotImplementedError("Pipeline Parallel Not Implemented Yet")
+        for mb_index, partition in schedule:
+            task = Task(lambda: partitions[partition](batches[mb_index].to(devices[partition])))
+            self.in_queues[partition].put(task)
+
+        for _, partition in schedule:
+            succeed, result = self.out_queues[partition].get()
+            if not succeed:
+                print(f"Error in partition {partition}")
+                print(result)
+            else:
+                batches[mb_index] = result[1]
         # END SOLUTION
 

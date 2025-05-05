@@ -40,10 +40,12 @@ class GPT2ModelParallel(GPT2ModelCustom):
         You should construct nn.Sequential using GPT2Block modules. Notice that each block returns multiple values but you will only need the hidden states.
         '''
 
-        # BEGIN SOLUTION
-        pipe = None
-        raise NotImplementedError("Pipeline Parallel Not Implemented Yet")
-        # END SOLUTION
+        self.pipeline_parallel = True
+        modified_layer_list = []
+        for i in range(len(self.h)):
+            modified_layer_list.append(self.h[i])
+            modified_layer_list.append(ExtractFirstItem())
+        pipe = Pipe(nn.Sequential(*modified_layer_list), split_size)
         self.h_pp = pipe
 
 class GPT2LMHeadModelParallel(GPT2LMHeadModelCustom):
