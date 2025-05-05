@@ -60,7 +60,7 @@ def run_pp(
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
     dataset = {
-        split: datasets.load_dataset(dataset_name, split=split)['translation']
+        split: datasets.load_dataset(dataset_name, split=split, trust_remote_code=True)['translation']
         for split in ['train', 'validation', 'test']
     }
     src_key, tgt_key = 'de', 'en'
